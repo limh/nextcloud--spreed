@@ -316,6 +316,7 @@ video {
 	position: absolute;
 	width: 33%;
 	min-width: 200px;
+	max-height: 30%;
 	right: 0;
 	bottom: 0;
 	top: initial;
