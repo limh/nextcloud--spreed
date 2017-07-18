@@ -27,13 +27,13 @@ use OCA\Spreed\Config;
 use OCA\Spreed\Exceptions\RoomNotFoundException;
 use OCA\Spreed\Manager;
 use OCA\Spreed\Room;
-use OCP\AppFramework\Controller;
-use OCP\AppFramework\Http\JSONResponse;
+use OCP\AppFramework\Http\DataResponse;
+use OCP\AppFramework\OCSController;
 use OCP\IDBConnection;
 use OCP\IRequest;
 use OCP\ISession;
 
-class SignallingController extends Controller {
+class SignallingController extends OCSController {
 	/** @var Config */
 	private $config;
 	/** @var ISession */
@@ -73,7 +73,7 @@ class SignallingController extends Controller {
 	 * @PublicPage
 	 *
 	 * @param string $messages
-	 * @return JSONResponse
+	 * @return DataResponse
 	 */
 	public function signalling($messages) {
 		$response = [];
@@ -135,35 +135,39 @@ class SignallingController extends Controller {
 			}
 		}
 
-		return new JSONResponse($response);
+		return new DataResponse($response);
 	}
 
 	/**
 	 * @PublicPage
+	 * @return DataResponse
 	 */
 	public function pullMessages() {
 		set_time_limit(0);
-		$eventSource = \OC::$server->createEventSource();
+		$data = [];
+		$seconds = 30;
 
-		while(true) {
+		while ($seconds > 0) {
+			// Guest
 			if ($this->userId === null) {
 				$sessionId = $this->session->get('spreed-session');
 
-				if (empty($sessionId)) {
-					// User is not active anywhere
-					$eventSource->send('usersInRoom', []);
-					$currentParticipant = false;
+				if ($sessionId === null) {
+					// User is not active anywhere;
+					$data[] = ['type' => 'usersInRoom', 'data' => []];
 					break;
-				} else {
-					$qb = $this->dbConnection->getQueryBuilder();
-					$qb->select('*')
-						->from('spreedme_room_participants')
-						->where($qb->expr()->eq('sessionId', $qb->createNamedParameter($sessionId)))
-						->andWhere($qb->expr()->eq('userId', $qb->createNamedParameter((string)$this->userId)));
-					$result = $qb->execute();
-					$currentParticipant = $result->fetch();
-					$result->closeCursor();
 				}
+
+				$qb = $this->dbConnection->getQueryBuilder();
+				$qb->select('*')
+					->from('spreedme_room_participants')
+					->where($qb->expr()->eq('sessionId', $qb->createNamedParameter($sessionId)))
+					->andWhere($qb->expr()->eq('userId', $qb->createNamedParameter((string)$this->userId)));
+				$result = $qb->execute();
+				$currentParticipant = $result->fetch();
+				$result->closeCursor();
+
+			// Logged in user
 			} else {
 				$qb = $this->dbConnection->getQueryBuilder();
 				$qb->select('*')
@@ -185,45 +189,52 @@ class SignallingController extends Controller {
 
 			if ($sessionId === null) {
 				// User is not active anywhere
-				$eventSource->send('usersInRoom', []);
+				$data[] = ['type' => 'usersInRoom', 'data' => []];
+				break;
+			}
+
+			// Check if the connection is still active, if not: Kill all existing
+			// messages and end the event source
+			if ($currentParticipant) {
+				try {
+					$room = $this->manager->getRoomForParticipant($currentParticipant['roomId'], $this->userId);
+					$data[] = ['type' => 'usersInRoom', 'data' => $this->getUsersInRoom($room)];
+				} catch (RoomNotFoundException $e) {
+					$data[] = ['type' => 'usersInRoom', 'data' => []];
+					break;
+				}
 			} else {
-				// Check if the connection is still active, if not: Kill all existing
-				// messages and end the event source
-				if ($currentParticipant) {
-					try {
-						$room = $this->manager->getRoomForParticipant($currentParticipant['roomId'], $this->userId);
-						$eventSource->send('usersInRoom', $this->getUsersInRoom($room));
-					} catch (RoomNotFoundException $e) {
-						$eventSource->send('usersInRoom', []);
-					}
-				} else {
-					$eventSource->send('usersInRoom', []);
-				}
+				$data[] = ['type' => 'usersInRoom', 'data' => []];
+				break;
+			}
 
-				// Query all messages and send them to the user
+			// Query all messages and send them to the user
+			$qb = $this->dbConnection->getQueryBuilder();
+			$qb->select('*')
+				->from('spreedme_messages')
+				->where($qb->expr()->eq('recipient', $qb->createNamedParameter($sessionId)));
+			$result = $qb->execute();
+			$rows = $result->fetchAll();
+			$result->closeCursor();
+
+			foreach($rows as $row) {
 				$qb = $this->dbConnection->getQueryBuilder();
-				$qb->select('*')
-					->from('spreedme_messages')
-					->where($qb->expr()->eq('recipient', $qb->createNamedParameter($sessionId)));
-				$result = $qb->execute();
-				$rows = $result->fetchAll();
-				$result->closeCursor();
-
-				foreach($rows as $row) {
-					$qb = $this->dbConnection->getQueryBuilder();
-					$qb->delete('spreedme_messages')
-						->where($qb->expr()->eq('id', $qb->createNamedParameter($row['id'])));
-					$qb->execute();
-					$eventSource->send('message', $row['object']);
-				}
+				$qb->delete('spreedme_messages')
+					->where($qb->expr()->eq('id', $qb->createNamedParameter($row['id'])));
+				$qb->execute();
+				$data[] = ['type' => 'message', 'data' =>  $row['object']];
 			}
 
 			$this->dbConnection->close();
+			if (empty($data) || $seconds <= 2) {
+				$seconds--;
+			} else {
+				$seconds = 2;
+			}
 			sleep(1);
 		}
 
-		$eventSource->close();
-		exit;
+		return new DataResponse($data);
 	}
 
 	/**
