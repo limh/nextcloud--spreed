@@ -398,6 +398,12 @@ class SignallingController extends Controller {
 			]);
 		}
 
+		if (!empty($userId)) {
+			// Rooms get sorted by last ping time for users, so make sure to
+			// update when a user joins a room.
+			$room->ping($userId, '0', time());
+		}
+
 		$response = [
 			'type' => 'room',
 			'room' => [
