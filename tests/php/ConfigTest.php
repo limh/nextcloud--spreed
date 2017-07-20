@@ -23,6 +23,7 @@ namespace OCA\Spreed\Tests\php;
 use OCA\Spreed\Config;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\IConfig;
+use OCP\Security\ISecureRandom;
 use Test\TestCase;
 
 class ConfigTest extends TestCase {
@@ -30,6 +31,8 @@ class ConfigTest extends TestCase {
 	public function testGetStunServer() {
 		/** @var \PHPUnit_Framework_MockObject_MockObject|ITimeFactory $timeFactory */
 		$timeFactory = $this->createMock(ITimeFactory::class);
+		/** @var \PHPUnit_Framework_MockObject_MockObject|ISecureRandom $secureRandom */
+		$secureRandom = $this->createMock(ISecureRandom::class);
 		/** @var \PHPUnit_Framework_MockObject_MockObject|IConfig $config */
 		$config = $this->createMock(IConfig::class);
 		$config
@@ -38,7 +41,7 @@ class ConfigTest extends TestCase {
 			->with('spreed', 'stun_server', 'stun.nextcloud.com:443')
 			->willReturn('88.198.160.129');
 
-		$helper = new Config($config, $timeFactory);
+		$helper = new Config($config, $secureRandom, $timeFactory);
 		$this->assertSame('88.198.160.129', $helper->getStunServer());
 	}
 
@@ -67,7 +70,9 @@ class ConfigTest extends TestCase {
 			->method('getTime')
 			->willReturn(1479743025);
 
-		$helper = new Config($config, $timeFactory);
+		/** @var \PHPUnit_Framework_MockObject_MockObject|ISecureRandom $secureRandom */
+		$secureRandom = $this->createMock(ISecureRandom::class);
+		$helper = new Config($config, $secureRandom, $timeFactory);
 
 		$this->assertSame(array(
 			'server' => 'turn.example.org',
