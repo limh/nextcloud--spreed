@@ -32,6 +32,8 @@ use OCP\AppFramework\Http\JSONResponse;
 use OCP\IDBConnection;
 use OCP\IRequest;
 use OCP\ISession;
+use OCP\IUser;
+use OCP\IUserManager;
 
 class SignallingController extends Controller {
 	/** @var Config */
@@ -44,6 +46,8 @@ class SignallingController extends Controller {
 	private $dbConnection;
 	/** @var string */
 	private $userId;
+	/** @var IUserManager */
+	private $userManager;
 
 	/**
 	 * @param string $appName
@@ -60,13 +64,15 @@ class SignallingController extends Controller {
 								ISession $session,
 								Manager $manager,
 								IDBConnection $connection,
-								$UserId) {
+								$UserId,
+								IUserManager $userManager) {
 		parent::__construct($appName, $request);
 		$this->config = $config;
 		$this->session = $session;
 		$this->dbConnection = $connection;
 		$this->manager = $manager;
 		$this->userId = $UserId;
+		$this->userManager = $userManager;
 	}
 
 	/**
@@ -76,6 +82,10 @@ class SignallingController extends Controller {
 	 * @return JSONResponse
 	 */
 	public function signalling($messages) {
+		if ($this->config->getSignalingServer() !== '') {
+			throw new \Exception('Internal signaling disabled.');
+		}
+
 		$response = [];
 		$messages = json_decode($messages, true);
 		foreach($messages as $message) {
@@ -142,6 +152,10 @@ class SignallingController extends Controller {
 	 * @PublicPage
 	 */
 	public function pullMessages() {
+		if ($this->config->getSignalingServer() !== '') {
+			throw new \Exception('Internal signaling disabled.');
+		}
+
 		set_time_limit(0);
 		$eventSource = \OC::$server->createEventSource();
 
@@ -259,4 +273,143 @@ class SignallingController extends Controller {
 
 		return $usersInRoom;
 	}
+
+	/*
+	 * Check if the current request is coming from an allowed backend.
+	 *
+	 * The backends are sending the custom header "Spreed-Signaling-Random"
+	 * containing at least 32 bytes random data, and the header
+	 * "Spreed-Signaling-Checksum", which is the SHA256-HMAC of the random data
+	 * and the body of the request, calculated with the shared secret from the
+	 * configuration.
+	 *
+	 * @return bool
+	 */
+	private function validateBackendRequest($data) {
+		$random = $_SERVER['HTTP_SPREED_SIGNALING_RANDOM'];
+		if (empty($random) || strlen($random) < 32) {
+			return false;
+		}
+		$checksum = $_SERVER['HTTP_SPREED_SIGNALING_CHECKSUM'];
+		if (empty($checksum)) {
+			return false;
+		}
+		$hash = hash_hmac('sha256', $random . $data, $this->config->getSignalingSecret());
+		return hash_equals($hash, strtolower($checksum));
+	}
+
+	/**
+	 * Backend API to query information required for standalone signaling
+	 * servers.
+	 *
+	 * See sections "Backend validation" in
+	 * https://github.com/nextcloud/spreed/wiki/Spreed-Signaling-API
+	 *
+	 * @NoCSRFRequired
+	 * @PublicPage
+	 *
+	 * @param string $message
+	 * @return JSONResponse
+	 */
+	public function backend() {
+		$json = file_get_contents('php://input');
+		if (!$this->validateBackendRequest($json)) {
+			return new JSONResponse([
+				'type' => 'error',
+				'error' => [
+					'code' => 'invalid_request',
+					'message' => 'The request could not be authenticated.',
+				],
+			]);
+		}
+
+		$message = json_decode($json, true);
+		switch ($message['type']) {
+			case 'auth':
+				// Query authentication information about a user.
+				return $this->backendAuth($message['auth']);
+			case 'room':
+				// Query information about a room.
+				return $this->backendRoom($message['room']);
+			default:
+				return new JSONResponse([
+					'type' => 'error',
+					'error' => [
+						'code' => 'unknown_type',
+						'message' => 'The given type ' . print_r($message, true) . ' is not supported.',
+					],
+				]);
+		}
+	}
+
+	private function backendAuth($auth) {
+		$params = $auth['params'];
+		$userId = $params['userid'];
+		if (!$this->config->validateSignalingTicket($userId, $params['ticket'])) {
+			return new JSONResponse([
+				'type' => 'error',
+				'error' => [
+					'code' => 'invalid_ticket',
+					'message' => 'The given ticket is not valid for this user.',
+				],
+			]);
+		}
+
+		if (!empty($userId)) {
+			$user = $this->userManager->get($userId);
+			if (!$user instanceof IUser) {
+				return new JSONResponse([
+					'type' => 'error',
+					'error' => [
+						'code' => 'no_such_user',
+						'message' => 'The given user does not exist.',
+					],
+				]);
+			}
+		}
+
+		$response = [
+			'type' => 'auth',
+			'auth' => [
+				'version' => '1.0',
+			],
+		];
+		if (!empty($userId)) {
+			$response['auth']['userid'] = $user->getUID();
+			$response['auth']['user'] = [
+				'displayname' => $user->getDisplayName(),
+			];
+		}
+		return new JSONResponse($response);
+	}
+
+	private function backendRoom($room) {
+		$roomId = $room['roomid'];
+		$userId = $room['userid'];
+		try {
+			$room = $this->manager->getRoomForParticipantByToken($roomId, $userId);
+		} catch (RoomNotFoundException $e) {
+			return new JSONResponse([
+				'type' => 'error',
+				'error' => [
+					'code' => 'no_such_room',
+					'message' => 'The user is not invited to this room.',
+				],
+			]);
+		}
+
+		$response = [
+			'type' => 'room',
+			'room' => [
+				'version' => '1.0',
+				'roomid' => $room->getToken(),
+				'properties' => [
+					'name' => $room->getName(),
+					'type' => $room->getType(),
+				],
+			],
+		];
+		return new JSONResponse($response);
+	}
+
 }

@@ -34,6 +34,11 @@ return [
 			'verb' => 'POST',
 		],
 		[
+			'name' => 'Signalling#backend',
+			'url' => '/signalling/backend',
+			'verb' => 'POST',
+		],
+		[
 			'name' => 'Signalling#pullMessages',
 			'url' => '/messages',
 			'verb' => 'GET',

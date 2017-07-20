@@ -52,5 +52,20 @@ style('spreed', ['settings-admin']);
         <p>
             <em><?php p($l->t('The TURN server is used to proxy the traffic from participants behind a firewall.')) ?></em>
         </p>
+        <p>
+            <label for="signaling_server"><?php p($l->t('External signaling server')) ?></label>
+            <input type="text" id="signaling_server"
+                   name="signaling_server" placeholder="wss://signaling.example.org"
+                   value="<?php p($_['signalingServer']) ?>" />
+        </p>
+        <p>
+            <label for="signaling_secret"><?php p($l->t('Shared secret for external signaling server')) ?></label>
+            <input type="text" id="signaling_secret"
+                   name="signaling_secret" placeholder="shared secret"
+                   value="<?php p($_['signalingSecret']) ?>" />
+        </p>
+        <p>
+            <em><?php p($l->t('An external signaling server can optionally be used for larger installations. Leave the field empty to use the internal signaling server.')) ?></em>
+        </p>
     </form>
 </div>

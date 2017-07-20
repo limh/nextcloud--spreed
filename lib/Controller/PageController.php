@@ -25,6 +25,7 @@ namespace OCA\Spreed\Controller;
 
 use OC\HintException;
 use OCA\Spreed\Exceptions\RoomNotFoundException;
+use OCA\Spreed\Config;
 use OCA\Spreed\Manager;
 use OCA\Spreed\Room;
 use OCP\AppFramework\Controller;
@@ -53,6 +54,8 @@ class PageController extends Controller {
 	private $url;
 	/** @var IManager */
 	private $notificationManager;
+	/** @var Config */
+	private $config;
 
 	/**
 	 * @param string $appName
@@ -64,6 +67,7 @@ class PageController extends Controller {
 	 * @param ISecureRandom $secureRandom
 	 * @param IURLGenerator $url
 	 * @param IManager $notificationManager
+	 * @param Config $config
 	 */
 	public function __construct($appName,
 								IRequest $request,
@@ -73,7 +77,8 @@ class PageController extends Controller {
 								Manager $manager,
 								ISecureRandom $secureRandom,
 								IURLGenerator $url,
-								IManager $notificationManager) {
+								IManager $notificationManager,
+								Config $config) {
 		parent::__construct($appName, $request);
 		$this->userId = $UserId;
 		$this->api = $api;
@@ -82,6 +87,7 @@ class PageController extends Controller {
 		$this->secureRandom = $secureRandom;
 		$this->url = $url;
 		$this->notificationManager = $notificationManager;
+		$this->config = $config;
 	}
 
 	/**
@@ -133,6 +139,8 @@ class PageController extends Controller {
 		$params = [
 			'sessionId' => $this->userId,
 			'token' => $token,
+			'signaling-server' => $this->config->getSignalingServer(),
+			'signaling-ticket' => $this->config->getSignalingTicket($this->userId),
 		];
 		$response = new TemplateResponse($this->appName, 'index', $params);
 		$csp = new ContentSecurityPolicy();
@@ -163,6 +171,8 @@ class PageController extends Controller {
 		$params = [
 			'sessionId' => $newSessionId,
 			'token' => $token,
+			'signaling-server' => $this->config->getSignalingServer(),
+			'signaling-ticket' => $this->config->getSignalingTicket($this->userId),
 		];
 		$response = new TemplateResponse($this->appName, 'index-public', $params, 'base');
 		$csp = new ContentSecurityPolicy();

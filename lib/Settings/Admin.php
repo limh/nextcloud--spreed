@@ -44,6 +44,8 @@ class Admin implements ISettings {
 			'turnServer' => $this->config->getAppValue('spreed', 'turn_server', ''),
 			'turnServerSecret' => $this->config->getAppValue('spreed', 'turn_server_secret', ''),
 			'turnServerProtocols' => $this->config->getAppValue('spreed', 'turn_server_protocols', ''),
+			'signalingServer' => $this->config->getAppValue('spreed', 'signaling_server', ''),
+			'signalingSecret' => $this->config->getAppValue('spreed', 'signaling_secret', ''),
 		];
 
 		return new TemplateResponse('spreed', 'settings-admin', $parameters, '');

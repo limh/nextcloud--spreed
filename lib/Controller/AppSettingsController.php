@@ -55,8 +55,10 @@ class AppSettingsController extends Controller {
 	 * @param string $stun_server
 	 * @param string $turn_server
 	 * @param string $turn_server_secret
+	 * @param string $signaling_server
+	 * @param string $signaling_secret
 	 */
-	public function setSpreedSettings($stun_server, $turn_server, $turn_server_secret, $turn_server_protocols) {
+	public function setSpreedSettings($stun_server, $turn_server, $turn_server_secret, $turn_server_protocols, $signaling_server, $signaling_secret) {
 		$stun_server = trim($stun_server);
 		if ($stun_server !== "") {
 			if (substr($stun_server, 0, 5) === "stun:") {
@@ -99,6 +101,17 @@ class AppSettingsController extends Controller {
 				);
 			}
 		}
+		$signaling_server = trim($signaling_server);
+		if ($signaling_server !== '') {
+			if (!filter_var($signaling_server, FILTER_VALIDATE_URL)) {
+				return array('data' =>
+					array('message' =>
+						(string) $this->l10n->t('Invalid signaling server url.')
+					),
+					'status' => 'error'
+				);
+			}
+		}
 
 		$currentStunServer = $this->config->getAppValue('spreed', 'stun_server', '');
 		if ( $currentStunServer !== $stun_server ) {
@@ -118,6 +131,16 @@ class AppSettingsController extends Controller {
 		$currentTurnServerProtocols = $this->config->getAppValue('spreed', 'turn_server_protocols', '');
 		if ( $currentTurnServerProtocols !== $turn_server_protocols ) {
 			$this->config->setAppValue('spreed', 'turn_server_protocols', $turn_server_protocols);
+		}
+
+		$currentSignalingServer = $this->config->getAppValue('spreed', 'signaling_server', '');
+		if ( $currentSignalingServer !== $signaling_server ) {
+			$this->config->setAppValue('spreed', 'signaling_server', $signaling_server);
+		}
+
+		$currentSignalingSecret = $this->config->getAppValue('spreed', 'signaling_secret', '');
+		if ( $currentSignalingSecret !== $signaling_secret ) {
+			$this->config->setAppValue('spreed', 'signaling_secret', $signaling_secret);
 		}
 
 		return array('data' =>
