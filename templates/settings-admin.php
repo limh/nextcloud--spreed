@@ -59,13 +59,18 @@ style('spreed', ['settings-admin']);
                    value="<?php p($_['signalingServer']) ?>" />
         </p>
         <p>
+            <em><?php p($l->t('An external signaling server can optionally be used for larger installations. Leave the field empty to use the internal signaling server.')) ?></em>
+        </p>
+        <p>
+            <input type="checkbox" id="signaling_skip_verify_cert" name="signaling_skip_verify_cert" class="checkbox" value="1" <?php p($_['signalingSkipVerifyCert'] ? 'checked="checked"' : '') ?>>
+            <label for="signaling_skip_verify_cert"><?php p($l->t('Allow invalid certificates when connecting to the external signaling server? Only enable this if required for development!')) ?>
+            </label>
+        </p>
+        <p>
             <label for="signaling_secret"><?php p($l->t('Shared secret for external signaling server')) ?></label>
             <input type="text" id="signaling_secret"
                    name="signaling_secret" placeholder="shared secret"
                    value="<?php p($_['signalingSecret']) ?>" />
-        </p>
-        <p>
-            <em><?php p($l->t('An external signaling server can optionally be used for larger installations. Leave the field empty to use the internal signaling server.')) ?></em>
         </p>
     </form>
 </div>

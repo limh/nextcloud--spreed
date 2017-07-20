@@ -57,8 +57,9 @@ class AppSettingsController extends Controller {
 	 * @param string $turn_server_secret
 	 * @param string $signaling_server
 	 * @param string $signaling_secret
+	 * @param string $signaling_skip_verify_cert
 	 */
-	public function setSpreedSettings($stun_server, $turn_server, $turn_server_secret, $turn_server_protocols, $signaling_server, $signaling_secret) {
+	public function setSpreedSettings($stun_server, $turn_server, $turn_server_secret, $turn_server_protocols, $signaling_server, $signaling_skip_verify_cert, $signaling_secret) {
 		$stun_server = trim($stun_server);
 		if ($stun_server !== "") {
 			if (substr($stun_server, 0, 5) === "stun:") {
@@ -136,6 +137,14 @@ class AppSettingsController extends Controller {
 		$currentSignalingServer = $this->config->getAppValue('spreed', 'signaling_server', '');
 		if ( $currentSignalingServer !== $signaling_server ) {
 			$this->config->setAppValue('spreed', 'signaling_server', $signaling_server);
+		}
+
+		$currentSignalingSkipVerifyCert = $this->config->getAppValue('spreed', 'signaling_skip_verify_cert', '');
+		if ($signaling_skip_verify_cert === null) {
+			$signaling_skip_verify_cert = '';
+		}
+		if ( $currentSignalingSkipVerifyCert !== $signaling_skip_verify_cert ) {
+			$this->config->setAppValue('spreed', 'signaling_skip_verify_cert', $signaling_skip_verify_cert);
 		}
 
 		$currentSignalingSecret = $this->config->getAppValue('spreed', 'signaling_secret', '');
