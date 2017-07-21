@@ -118,30 +118,6 @@ class SignallingController extends Controller {
 					$this->dbConnection->close();
 
 					break;
-				case 'stunservers':
-					$response = [];
-					$stunServer = $this->config->getStunServer();
-					if ($stunServer) {
-						$response[] = [
-							'url' => 'stun:' . $stunServer,
-						];
-					}
-					break;
-				case 'turnservers':
-					$response = [];
-					$turnSettings = $this->config->getTurnSettings();
-					if (!empty($turnSettings['server'])) {
-						$protocols = explode(',', $turnSettings['protocols']);
-						foreach ($protocols as $proto) {
-							$response[] = [
-								'url' => ['turn:' . $turnSettings['server'] . '?transport=' . $proto],
-								'urls' => ['turn:' . $turnSettings['server'] . '?transport=' . $proto],
-								'username' => $turnSettings['username'],
-								'credential' => $turnSettings['password'],
-							];
-						}
-					}
-					break;
 			}
 		}
 
